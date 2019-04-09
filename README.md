@@ -21,8 +21,8 @@ Plugin for Sublime Text 2 and 3.
         "button": "button1",
         "count": 1,
         "modifiers": ["ctrl"],
-        "press\_command": "drag\_select",
-        "command": "open\_typo3\_ext\_path\_under\_cursor"
+        "press_command": "drag_select",
+        "command": "open_typo3_ext_path_under_cursor"
     }
 ]
 ```
