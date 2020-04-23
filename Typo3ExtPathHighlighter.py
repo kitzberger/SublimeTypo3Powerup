@@ -16,16 +16,7 @@ class Typo3ExtPathHighlighter(sublime_plugin.EventListener):
 	def on_activated(self, view):
 		self.update_url_highlights(view)
 
-	# Blocking handlers for ST2
-	def on_load(self, view):
-		if sublime.version() < '3000':
-			self.update_url_highlights(view)
-
-	def on_modified(self, view):
-		if sublime.version() < '3000':
-			self.update_url_highlights(view)
-
-	# Async listeners for ST3
+	# Async listeners
 	def on_load_async(self, view):
 		self.update_url_highlights_async(view)
 
@@ -61,8 +52,7 @@ class Typo3ExtPathHighlighter(sublime_plugin.EventListener):
 		if (should_highlight_urls):
 			self.highlight_urls(view, urls)
 
-	"""Same as update_url_highlights, but avoids race conditions with a
-	semaphore."""
+	"""Same as update_url_highlights, but avoids race conditions with a semaphore."""
 	def update_url_highlights_async(self, view):
 		Typo3ExtPathHighlighter.highlight_semaphore.acquire()
 		try:
@@ -70,8 +60,7 @@ class Typo3ExtPathHighlighter(sublime_plugin.EventListener):
 		finally:
 			Typo3ExtPathHighlighter.highlight_semaphore.release()
 
-	"""Creates a set of regions from the intersection of urls and scopes,
-	underlines all of them."""
+	"""Creates a set of regions from the intersection of urls and scopes, underlines all of them."""
 	def highlight_urls(self, view, urls):
 		# We need separate regions for each lexical scope for ST to use a proper color for the underline
 		scope_map = {}
@@ -84,25 +73,13 @@ class Typo3ExtPathHighlighter(sublime_plugin.EventListener):
 
 		self.update_view_scopes(view, scope_map.keys())
 
-	"""Apply underlining with provided scope name to provided regions.
-	Uses the empty region underline hack for Sublime Text 2 and native
-	underlining for Sublime Text 3."""
+	"""Apply underlining with provided scope name to provided regions."""
 	def underline_regions(self, view, scope_name, regions):
-		if sublime.version() >= '3019':
-			# in Sublime Text 3, the regions are just underlined
-			view.add_regions(
-				u'clickable-urls ' + scope_name,
-				regions,
-				scope_name,
-				flags=sublime.DRAW_NO_FILL|sublime.DRAW_NO_OUTLINE|sublime.DRAW_STIPPLED_UNDERLINE)
-		else:
-			# in Sublime Text 2, the 'empty region underline' hack is used
-			char_regions = [sublime.Region(pos, pos) for region in regions for pos in range(region.a, region.b)]
-			view.add_regions(
-				u'clickable-urls ' + scope_name,
-				char_regions,
-				scope_name,
-				sublime.DRAW_EMPTY_AS_OVERWRITE)
+		view.add_regions(
+			u'clickable-urls ' + scope_name,
+			regions,
+			scope_name,
+			flags=sublime.DRAW_NO_FILL|sublime.DRAW_NO_OUTLINE|sublime.DRAW_STIPPLED_UNDERLINE)
 
 	"""Store new set of underlined scopes for view. Erase underlining from
 	scopes that were used but are not anymore."""

@@ -1,16 +1,24 @@
 # TYPO3 ExtPath Highlighter
 
-Plugin for Sublime Text 2 and 3.
+Plugin for Sublime Text 3.
 
-## Summary
+## Features
+
+### Highlights TYPO3 paths
 
 * Highlights TYPO3 paths like EXT:my\_extension/Resources/Private/Language/locallang\_db.xlf
 * Provides a command to open such a file (can be triggered by click or shortcut)
 
+### Toggle fluid syntaxes
+
+* Toggles between classical tag style and inline style of fluid viewhelpers
+* Provides a command to transform tags
+
 ## Key binding
 
 ```User/Default (Linux).sublime-keymap
-{ "keys": ["ctrl+alt+enter"], "command": "open_typo3_ext_path_under_cursor" }
+{ "keys": ["ctrl+alt+enter"], "command": "open_typo3_ext_path_under_cursor" },
+{ "keys": ["ctrl+alt+shift+enter"], "command": "toggle_typo3_fluid_syntax_under_cursor" }
 ```
 
 ## Mouse binding

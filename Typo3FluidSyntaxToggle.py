@@ -79,15 +79,11 @@ class Typo3FluidSyntaxToggle(sublime_plugin.EventListener):
 
 	"""Apply underlining with provided scope name to provided regions."""
 	def underline_regions(self, view, scope_name, regions):
-		if sublime.version() >= '3019':
-			# in Sublime Text 3, the regions are just underlined
-			view.add_regions(
-				u'clickable-tags ' + scope_name,
-				regions,
-				scope_name,
-				flags=sublime.DRAW_NO_FILL|sublime.DRAW_NO_OUTLINE|sublime.DRAW_STIPPLED_UNDERLINE)
-		else:
-			print('No support for Sublime text version < 3')
+		view.add_regions(
+			u'clickable-tags ' + scope_name,
+			regions,
+			scope_name,
+			flags=sublime.DRAW_NO_FILL|sublime.DRAW_NO_OUTLINE|sublime.DRAW_STIPPLED_UNDERLINE)
 
 	"""Store new set of underlined scopes for view. Erase underlining from
 	scopes that were used but are not anymore."""
