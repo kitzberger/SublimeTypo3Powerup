@@ -5,8 +5,9 @@ import re
 
 class Typo3FluidSyntaxToggle(sublime_plugin.EventListener):
 
-	DEFAULT_REGEX = "<([a-z]+:[a-z\.]+)\s+([^>]*)\s+\/>"
-	INLINE_REGEX =  "{([a-z]+:[a-z\.]+)\(([^}]*)\)}"
+	TAG_STANDALONE_REGEX = "<([a-zA-Z]+:[a-zA-Z\.]+)\s+([^>]*)\s+\/>"
+	TAG_CLASSIC_REGEX =    "<([a-zA-Z]+:[a-zA-Z\.]+)\s+([^>]*)>(.*)<\/\1>"
+	INLINE_REGEX =         "{([a-zA-Z]+:[a-zA-Z\.]+)\(([^}]*)\)}"
 	DEFAULT_MAX_TAGS = 200
 	SETTINGS_FILENAME = 'Typo3Powerup.sublime-settings'
 
@@ -40,7 +41,7 @@ class Typo3FluidSyntaxToggle(sublime_plugin.EventListener):
 		if view.id() in Typo3FluidSyntaxToggle.ignored_views:
 			return
 
-		tags = view.find_all(Typo3FluidSyntaxToggle.DEFAULT_REGEX + '|' + Typo3FluidSyntaxToggle.INLINE_REGEX)
+		tags = view.find_all(Typo3FluidSyntaxToggle.TAG_STANDALONE_REGEX + '|' + Typo3FluidSyntaxToggle.INLINE_REGEX)
 		print(tags)
 
 		# Avoid slowdowns for views with too much URLs
@@ -105,7 +106,7 @@ def transform_tag(tag):
 	print('transform_tag()')
 	print(tag)
 	if (tag[:1] == '<'):
-		m = re.match(r'' + Typo3FluidSyntaxToggle.DEFAULT_REGEX, tag)
+		m = re.match(r'' + Typo3FluidSyntaxToggle.TAG_STANDALONE_REGEX, tag)
 		# print()
 		# print(str(m.group(0)))
 		# print()
@@ -113,6 +114,7 @@ def transform_tag(tag):
 		tagName = m.group(1)
 		tagAttributes = m.group(2)
 
+		tagAttributes = re.sub(r'{(.*)}', lambda matchObj: transform_object(matchObj), tagAttributes)
 		tagAttributes = re.sub(r'=', ':', tagAttributes)
 		tagAttributes = re.sub(r'"', '\'', tagAttributes)
 		tagAttributes = re.sub(r' ', ',', tagAttributes)
@@ -134,6 +136,24 @@ def transform_tag(tag):
 		tag = '<' + tagName + ' ' + tagAttributes + ' />'
 	print(tag)
 	return tag
+
+#
+# {xxx:yyy,aaa:bbb} -> {xxx:\'{yyy}\',aaa:\'{bbb}\'}}
+#
+def transform_object(matchObj):
+	obj = matchObj.group(0)
+	obj = re.sub(r' ', '', obj)
+	obj = re.sub(r'[a-zA-Z]+:[a-zA-Z]+', lambda matchObj: transform_object_property(matchObj), obj)
+	return obj
+
+#
+# xxx:yyy -> xxx:\'{yyy}\'
+#
+def transform_object_property(matchObj):
+	prop = matchObj.group(0)
+	prop = re.sub(r':([a-zA-Z]+)', ':\\\'{\\1}\\\'', prop)
+	return prop
+
 
 class ToggleTypo3FluidSyntaxUnderCursorCommand(sublime_plugin.TextCommand):
 	def run(self, edit):
