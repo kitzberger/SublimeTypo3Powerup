@@ -1,0 +1,33 @@
+
+
+Case 1: Classic
+
+<f:translate key="LLL:EXT:my_extension/Resources/Private/Language/locallang.xlf:solr.start_new_search" extensionName="my_extension" />
+
+Case 1: Inline
+
+{f:translate(key:'LLL:EXT:my_extension/Resources/Private/Language/locallang.xlf:solr.start_new_search',extensionName:'my_extension')}
+
+
+
+Case 2: Classic
+
+<f:cObject typoscriptObjectPath="lib.foo" empty="" number="123" currentValueKey="{variable}" arguments="{foo:bar,number:123,text:'text'}" arguments2="{foo:bar}" />
+
+Case 2: Inline
+
+{f:cObject(typoscriptObjectPath:'lib.foo',empty:'',number:123,currentValueKey:variable,arguments:'{foo:\'{bar}\',number:123,text:\'text\'}',arguments2:'{foo:\'{bar}\'}')}
+
+
+
+
+
+Case 3: Nested Classic
+
+<f:format.crop max="123">
+	<f:translate key="solr.start_new_search" extensionName="my_extension" arguments="{0:variable, 1:'text'}" />
+</f:format.raw>
+
+Case 3: Nested Inline
+
+{f:translate(key:'solr.start_new_search',extensionName:'my_extension',arguments:'{0:\'{variable}\', 1:\'text\'}') -> f:format.crop(max:123)}
