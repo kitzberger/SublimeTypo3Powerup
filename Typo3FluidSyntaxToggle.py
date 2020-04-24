@@ -5,11 +5,17 @@ import re
 
 class Typo3FluidSyntaxToggle(sublime_plugin.EventListener):
 
+	SETTINGS_FILENAME = 'Typo3Powerup.sublime-settings'
+	DEFAULT_MAX_TAGS = 200
+
 	TAG_STANDALONE_REGEX = "<([a-zA-Z]+:[a-zA-Z\.]+)\s+([^>]*)\s+\/>"
 	TAG_CLASSIC_REGEX =    "<([a-zA-Z]+:[a-zA-Z\.]+)\s+([^>]*)>(.*)<\/\1>"
-	INLINE_REGEX =         "{([a-zA-Z]+:[a-zA-Z\.]+)\(([^}]*)\)}"
-	DEFAULT_MAX_TAGS = 200
-	SETTINGS_FILENAME = 'Typo3Powerup.sublime-settings'
+	INLINE_REGEX =         "{([a-zA-Z]+:[a-zA-Z\.]+)\((.*)\)}"
+
+	SYNTAX_INLINE = 1
+	SYNTAX_CLASSIC = 2
+
+	attributeObjects = []
 
 	tags_for_view = {}
 	scopes_for_view = {}
@@ -42,7 +48,7 @@ class Typo3FluidSyntaxToggle(sublime_plugin.EventListener):
 			return
 
 		tags = view.find_all(Typo3FluidSyntaxToggle.TAG_STANDALONE_REGEX + '|' + Typo3FluidSyntaxToggle.INLINE_REGEX)
-		print(tags)
+		#print(tags)
 
 		# Avoid slowdowns for views with too much URLs
 		if len(tags) > max_tag_limit:
@@ -100,66 +106,119 @@ class Typo3FluidSyntaxToggle(sublime_plugin.EventListener):
 
 def transform_tag(tag):
 	print('transform_tag()')
-	print(tag)
+	print('-> ' + tag)
+
+	Typo3FluidSyntaxToggle.attributeObjects = []
+
 	if (tag[:1] == '<'):
 		m = re.match(r'' + Typo3FluidSyntaxToggle.TAG_STANDALONE_REGEX, tag)
-		# print()
-		# print(str(m.group(0)))
-		# print()
 
 		tagName = m.group(1)
 		tagAttributes = m.group(2)
 
-		tagAttributes = re.sub(r'{(.*)}', lambda matchObj: transform_object(matchObj), tagAttributes)
+		tagAttributes = re.sub(r'"{(.*?)}"', lambda matchObj: replaceAttributeObjects(matchObj, Typo3FluidSyntaxToggle.SYNTAX_INLINE), tagAttributes)
 		tagAttributes = re.sub(r'=', ':', tagAttributes)
 		tagAttributes = re.sub(r'"', '\'', tagAttributes)
 		tagAttributes = re.sub(r' ', ',', tagAttributes)
+		tagAttributes = re.sub(r'[a-zA-Z0-9]+:([a-z-A-Z0-9\.\'_]+)', lambda matchObj: transform_attribute(matchObj, Typo3FluidSyntaxToggle.SYNTAX_INLINE), tagAttributes)
 
 		tag = '{' + tagName + '(' + tagAttributes.strip() + ')}'
 	else:
 		m = re.match(r'' + Typo3FluidSyntaxToggle.INLINE_REGEX, tag)
-		# print()
-		# print(str(m.group(0)))
-		# print()
 
 		tagName = m.group(1)
 		tagAttributes = m.group(2)
 
+		tagAttributes = re.sub(r'\'{.*?}\'', lambda matchObj: replaceAttributeObjects(matchObj, Typo3FluidSyntaxToggle.SYNTAX_CLASSIC), tagAttributes)
 		tagAttributes = re.sub(r':', '=', tagAttributes)
-		tagAttributes = re.sub(r'\'', '"', tagAttributes)
 		tagAttributes = re.sub(r',', ' ', tagAttributes)
+		tagAttributes = re.sub(r'([a-zA-Z0-9]+)=([a-z-A-Z0-9\.\'_]+)', lambda matchObj: transform_attribute(matchObj, Typo3FluidSyntaxToggle.SYNTAX_CLASSIC), tagAttributes)
 
 		tag = '<' + tagName + ' ' + tagAttributes + ' />'
-	print(tag)
+	print('<- ' + tag)
 	return tag
 
-#
-# {xxx:yyy,aaa:bbb} -> {xxx:\'{yyy}\',aaa:\'{bbb}\'}}
-#
-def transform_object(matchObj):
+def replaceAttributeObjects(matchObj, targetSyntax):
 	obj = matchObj.group(0)
-	obj = re.sub(r' ', '', obj)
-	obj = re.sub(r'[a-zA-Z]+:[a-zA-Z]+', lambda matchObj: transform_object_property(matchObj), obj)
+	print('replaceAttributeObjects(): ' + obj)
+
+	Typo3FluidSyntaxToggle.attributeObjects.append(obj)
+
+	return '___attributeObject_' + str(len(Typo3FluidSyntaxToggle.attributeObjects)-1) + '___'
+
+#
+# blah:variable                   <->     blah="{variable}"
+# blah:'text'                     <->     blah="text"
+# blah:123                        <->     blah="123"
+# blah:___attributeObject_X___    <->     blah="{xxx:yyy, ...}"
+#
+def transform_attribute(matchObj, targetSyntax):
+	obj = matchObj.group(0)
+	print('transform_attribute(): ' + obj)
+	if (targetSyntax == Typo3FluidSyntaxToggle.SYNTAX_INLINE):
+		obj = re.sub(r':\'([0-9]+)\'', ':\\1', obj)
+		obj = re.sub(r'___attributeObject_(\d+)___', lambda matchObj: transform_attribute_object(matchObj, targetSyntax), obj)
+	else:
+		obj = re.sub(r'\'', '"', obj)
+		obj = re.sub(r'=([0-9]+)', '="\\1"', obj)
+		obj = re.sub(r'=([a-zA-Z0-9]+)', '="{\\1}"', obj)
+		obj = re.sub(r'___attributeObject_(\d+)___', lambda matchObj: transform_attribute_object(matchObj, targetSyntax), obj)
 	return obj
 
 #
-# xxx:yyy -> xxx:\'{yyy}\'
+# ___attributeObject_X___ -> {xxx:\'{yyy}\',foo:\'text\'}}
 #
-def transform_object_property(matchObj):
+def transform_attribute_object(matchObj, targetSyntax):
+	obj = matchObj.group(1)
+	print('transform_attribute_object(): ' + obj)
+
+	if (Typo3FluidSyntaxToggle.attributeObjects[int(obj)]):
+		obj = Typo3FluidSyntaxToggle.attributeObjects[int(obj)]
+		print('transform_attribute_object(): ' + obj)
+
+		if (targetSyntax == Typo3FluidSyntaxToggle.SYNTAX_INLINE):
+			obj = re.sub(r'"{(.*)}"', '\\1', obj)
+			if (re.search(r':', obj) == None):
+				return obj
+			else:
+				obj = re.sub(r'([a-zA-Z]+:[\\\'{}a-zA-Z0-9]+)', lambda matchObj: transform_attribute_object_property(matchObj, targetSyntax), obj)
+				return '\'{' + obj + '}\''
+
+		else:
+			obj = re.sub(r'\'{(.*)}\'', '\\1', obj)
+			obj = re.sub(r'([a-zA-Z]+:[\\\'{}a-zA-Z0-9]+)', lambda matchObj: transform_attribute_object_property(matchObj, targetSyntax), obj)
+			return '"{' + obj + '}"'
+	else:
+		return 'ERROR'
+
+#
+# foo:variable <-> foo:\'{variable}\'
+# foo:'text'   <-> foo:\'text\'
+# foo:123      <-> foo:123
+#
+def transform_attribute_object_property(matchObj, targetSyntax):
 	prop = matchObj.group(0)
-	prop = re.sub(r':([a-zA-Z]+)', ':\\\'{\\1}\\\'', prop)
+	print('transform_attribute_object_property(): ' + prop)
+
+	if (targetSyntax == Typo3FluidSyntaxToggle.SYNTAX_INLINE):
+		prop = re.sub(r'\'', '\\\'', prop)
+		prop = re.sub(r':([a-zA-Z]+)', ':\\\'{\\1}\\\'', prop)
+	else:
+		prop = re.sub(r':\\\'{([a-zA-Z0-9]+)}\\\'', ':\\1', prop)
+		prop = re.sub(r'\\\'', '\'', prop)
 	return prop
 
 
 class ToggleTypo3FluidSyntaxUnderCursorCommand(sublime_plugin.TextCommand):
 	def run(self, edit):
+		print()
 		if self.view.id() in Typo3FluidSyntaxToggle.tags_for_view:
 			selection = self.view.sel()[0]
 			if selection.empty():
 				selection = next((tag for tag in Typo3FluidSyntaxToggle.tags_for_view[self.view.id()] if tag.contains(selection)), None)
 				if not selection:
 					return
-			print(selection)
+			#print(selection)
 			tagBefore = self.view.substr(selection)
 			tagAfter = transform_tag(tagBefore)
 			self.view.replace(edit, selection, tagAfter)
